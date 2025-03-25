@@ -265,7 +265,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				sortColumnProcesses = pNMLV->iSubItem;
 				ascendingProcesses = true;
 			}
-			ListView_SortItems(hListProcesses, CompareFuncProcesses, (LPARAM)&ascendingProcesses);
 		}
 
 		// Обработка списка потоков
@@ -278,7 +277,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				sortColumnThreads = pNMLV->iSubItem;
 				ascendingThreads = true;
 			}
-			ListView_SortItems(hListThreads, CompareFuncThreads, (LPARAM)&ascendingThreads);
 		}
 
 		break;
@@ -458,12 +456,12 @@ void InitProcessListView(HWND hWndListView)
 
 	// Колонка с идентификаторами процессов
 	lvc.cx = 80;           // Ширина колонки
-	lvc.pszText = (LPWSTR)L"PID";  // Название колонки
+	lvc.pszText = (LPWSTR)L"id";  // Название колонки
 	ListView_InsertColumn(hWndListView, 0, &lvc);  // Вставка первой колонки
 
 	// Колонка с именами процессов
 	lvc.cx = 180;          // Ширина колонки
-	lvc.pszText = (LPWSTR)L"Имя процесса";  // Название колонки
+	lvc.pszText = (LPWSTR)L"Название";  // Название колонки
 	ListView_InsertColumn(hWndListView, 1, &lvc);  // Вставка второй колонки
 
 	// Колонка с количеством потоков
@@ -484,12 +482,12 @@ void InitThreadListView(HWND hWndListView)
 
 	// Колонка с идентификаторами потоков
 	lvc.cx = 100;           // Ширина колонки
-	lvc.pszText = (LPWSTR)L"TID";  // Название колонки
+	lvc.pszText = (LPWSTR)L"id";  // Название колонки
 	ListView_InsertColumn(hWndListView, 0, &lvc);  // Вставка первой колонки
 
 	// Колонка с идентификаторами процессов
 	lvc.cx = 100;           // Ширина колонки
-	lvc.pszText = (LPWSTR)L"PID процесса";  // Название колонки
+	lvc.pszText = (LPWSTR)L"Процесс-родитель";  // Название колонки
 	ListView_InsertColumn(hWndListView, 1, &lvc);  // Вставка второй колонки
 }
 
@@ -526,50 +524,6 @@ void UpdateTotalThreadCount(HWND hWnd) {
 	wchar_t buffer[50];
 	swprintf(buffer, 50, L"Потоков: %d", totalThreads);
 	SetWindowText(hStaticThreadCount, buffer);
-}
-
-int CALLBACK CompareFuncProcesses(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort) {
-	bool ascending = *(bool*)lParamSort;
-	wchar_t text1[256], text2[256];
-
-	// Получаем индекс строк
-	int index1 = ListView_FindItemByLParam(hListProcesses, lParam1);
-	int index2 = ListView_FindItemByLParam(hListProcesses, lParam2);
-
-	ListView_GetItemText(hListProcesses, index1, sortColumnProcesses, text1, sizeof(text1));
-	ListView_GetItemText(hListProcesses, index2, sortColumnProcesses, text2, sizeof(text2));
-
-	int result = 0;
-
-	// Числовая или строковая сортировка
-	if (sortColumnProcesses == 0 || sortColumnProcesses == 2) {  // ID процесса / Количество потоков
-		int num1 = _wtoi(text1);
-		int num2 = _wtoi(text2);
-		result = num1 - num2;
-	}
-	else {  // Имя процесса (строка)
-		result = wcscmp(text1, text2);
-	}
-
-	return ascending ? result : -result;
-}
-
-int CALLBACK CompareFuncThreads(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
-{
-	bool ascending = *(bool*)lParamSort;
-	wchar_t text1[256], text2[256];
-
-	int index1 = ListView_FindItemByLParam(hListThreads, lParam1);
-	int index2 = ListView_FindItemByLParam(hListThreads, lParam2);
-
-	ListView_GetItemText(hListThreads, index1, sortColumnThreads, text1, sizeof(text1));
-	ListView_GetItemText(hListThreads, index2, sortColumnThreads, text2, sizeof(text2));
-
-	int num1 = _wtoi(text1);
-	int num2 = _wtoi(text2);
-	int result = num1 - num2;
-
-	return ascending ? result : -result;
 }
 
 int ListView_FindItemByLParam(HWND hListView, LPARAM lParam) {
