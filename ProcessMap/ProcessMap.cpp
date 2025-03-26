@@ -631,3 +631,47 @@ bool IsSystemProcess(DWORD processID)
 	CloseHandle(hProcess);
 	return isSystem;
 }
+
+int CALLBACK CompareFuncProcesses(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort) {
+	bool ascending = *(bool*)lParamSort;
+	wchar_t text1[256], text2[256];
+
+	// Получаем индекс строк
+	int index1 = ListView_FindItemByLParam(hListProcesses, lParam1);
+	int index2 = ListView_FindItemByLParam(hListProcesses, lParam2);
+
+	ListView_GetItemText(hListProcesses, index1, sortColumnProcesses, text1, sizeof(text1));
+	ListView_GetItemText(hListProcesses, index2, sortColumnProcesses, text2, sizeof(text2));
+
+	int result = 0;
+
+	// Числовая или строковая сортировка
+	if (sortColumnProcesses == 0 || sortColumnProcesses == 2) {  // ID процесса / Количество потоков
+		int num1 = _wtoi(text1);
+		int num2 = _wtoi(text2);
+		result = num1 - num2;
+	}
+	else {  // Имя процесса (строка)
+		result = wcscmp(text1, text2);
+	}
+
+	return ascending ? result : -result;
+}
+
+int CALLBACK CompareFuncThreads(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
+{
+	bool ascending = *(bool*)lParamSort;
+	wchar_t text1[256], text2[256];
+
+	int index1 = ListView_FindItemByLParam(hListThreads, lParam1);
+	int index2 = ListView_FindItemByLParam(hListThreads, lParam2);
+
+	ListView_GetItemText(hListThreads, index1, sortColumnThreads, text1, sizeof(text1));
+	ListView_GetItemText(hListThreads, index2, sortColumnThreads, text2, sizeof(text2));
+
+	int num1 = _wtoi(text1);
+	int num2 = _wtoi(text2);
+	int result = num1 - num2;
+
+	return ascending ? result : -result;
+}
