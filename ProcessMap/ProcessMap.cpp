@@ -9,6 +9,8 @@
 
 // Определение макроса для максимальной длины строки загрузки (заголовка окна)
 #define MAX_LOADSTRING 100
+#define IDC_STATUS_BAR 1001
+
 
 // Глобальная переменная экземпляра приложения
 HINSTANCE hInst;
@@ -31,9 +33,9 @@ HWND hListProcesses;
 // Дескриптор окна списка потоков
 HWND hListThreads;
 // Дескриптор списка процессов
-HWND hStaticProcessCount;
-// Дескриптор списка потоков
-HWND hStaticThreadCount;
+HWND hStatusBar;
+
+int parts[] = { 150, 300, 450, -1 }; // -1 означает, что последняя секция занимает оставшееся место
 
 int sortColumnProcesses = 0;  // По умолчанию сортировка по PID
 bool ascendingProcesses = true;
@@ -169,23 +171,29 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			400, 20, 200, 500,
 			hWnd, (HMENU)IDC_LIST_THREADS, NULL, NULL);
 
-		hStaticProcessCount = CreateWindowW(L"STATIC", L"Процессов: 0",
-			WS_CHILD | WS_VISIBLE,
-			20, 0, 350, 25,
-			hWnd, (HMENU)IDC_STATIC_PROCESS_COUNT, NULL, NULL);
-
-		// Текст "Потоков: Y"
-		hStaticThreadCount = CreateWindowW(L"STATIC", L"Потоков: 0",
-			WS_CHILD | WS_VISIBLE,
-			400, 0, 200, 25,
-			hWnd, (HMENU)IDC_STATIC_THREAD_COUNT, NULL, NULL);
-
-		// Инициализируем списки процессов и потоков
+		// Инициализируем списки
 		InitProcessListView(hListProcesses);
 		InitThreadListView(hListThreads);
 
 		// Заполняем список процессов
+
+
+		// Создаем статус-бар
+		hStatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
+			WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+			0, 0, 0, 0, hWnd, (HMENU)IDC_STATUS_BAR, hInst, NULL);
+
+		// Разделение статус-бара на секции
+		SendMessage(hStatusBar, SB_SETPARTS, _countof(parts), (LPARAM)parts);
+
+		// Устанавливаем текст в статус-баре
+		SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)L"Процессов: 0");
+		SendMessage(hStatusBar, SB_SETTEXT, 1, (LPARAM)L"Потоков: 0");
+		SendMessage(hStatusBar, SB_SETTEXT, 2, (LPARAM)L"Общ. потоков: None");
 		PopulateProcessesList(hListProcesses);
+
+		// Заполняем список потоков (изначально без выбора процесса)
+		PopulateThreadsList(hListThreads, 0);
 		break;
 
 	case WM_PAINT: // Сообщение приходит при необходимости перерисовки окна
@@ -336,7 +344,7 @@ void PopulateProcessesList(HWND hList)
 
 			// Открываем процесс для получения дополнительной информации
 			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-			
+
 			if (hProcess || !hProcess)
 			{
 				// По умолчанию имя процесса неизвестно
@@ -354,12 +362,14 @@ void PopulateProcessesList(HWND hList)
 				// Подсчитываем количество потоков в процессе
 				DWORD threadCount = 0;
 				HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+				int totalThreads = 0;
 				if (hSnap != INVALID_HANDLE_VALUE)
 				{
 					PROCESSENTRY32 pe;
 					pe.dwSize = sizeof(pe);
 					if (Process32First(hSnap, &pe))
 					{
+						totalThreads++;
 						do {
 							if (pe.th32ProcessID == pid) {
 								threadCount = pe.cntThreads;
@@ -369,6 +379,10 @@ void PopulateProcessesList(HWND hList)
 					}
 					CloseHandle(hSnap);
 				}
+
+				wchar_t threadCountStr[50];
+				swprintf(threadCountStr, 50, L"Общ. потоков: %d", threadCount);
+				SendMessage(hStatusBar, SB_SETTEXT, 2, (LPARAM)threadCountStr);
 
 				// Преобразовываем идентификаторы в строки
 				wchar_t pidStr[10], threadStr[10];
@@ -390,11 +404,16 @@ void PopulateProcessesList(HWND hList)
 				// Закрываем дескриптор процесса
 				CloseHandle(hProcess);
 			}
+			// Обновляем статус-бар с актуальным количеством процессов
+			//wchar_t processCountStr[50];
+			//swprintf(processCountStr, 50, L"Процессовввв: %d", count);
+			//SendMessage(hStatusBar, SB_SETTEXT, 1, (LPARAM)processCountStr);
 		}
+
 	}
 
-	UpdateProcessCount(hStaticProcessCount);
-	UpdateTotalThreadCount(hStaticThreadCount);
+	UpdateProcessCount();
+	UpdateTotalThreadCount();
 }
 
 // Функция заполняет список потоков для указанного процесса в предоставленное окно списка.
@@ -439,9 +458,15 @@ void PopulateThreadsList(HWND hList, DWORD processId)
 			}
 		} while (Thread32Next(hSnap, &te));  // Переходим к следующему потоку
 	}
+	// Обновляем статус-бар с актуальным количеством потоков
+
 
 	// Закрываем дескриптор снимка
 	CloseHandle(hSnap);
+	int threadCount = ListView_GetItemCount(hList);
+	wchar_t threadCountStr[50];
+	swprintf(threadCountStr, 50, L"Потоков: %d", threadCount);
+	SendMessage(hStatusBar, SB_SETTEXT, 1, (LPARAM)threadCountStr);
 }
 
 // Функция инициализирует список процессов, добавляя необходимые колонки.
@@ -491,8 +516,7 @@ void InitThreadListView(HWND hWndListView)
 	ListView_InsertColumn(hWndListView, 1, &lvc);  // Вставка второй колонки
 }
 
-void UpdateProcessCount(HWND hWnd)
-{
+void UpdateProcessCount() {
 	DWORD processes[1024], needed;
 	int count = 0;
 
@@ -502,11 +526,28 @@ void UpdateProcessCount(HWND hWnd)
 
 	wchar_t buffer[50];
 	swprintf(buffer, 50, L"Процессов: %d", count);
-	SetWindowText(hStaticProcessCount, buffer);
+	SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)buffer);
+
+	// Получаем количество потоков перед обновлением статус-бара
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	int totalThreads = 0;
+
+	if (hSnap != INVALID_HANDLE_VALUE) {
+		THREADENTRY32 te;
+		te.dwSize = sizeof(te);
+
+		if (Thread32First(hSnap, &te)) {
+			do {
+				totalThreads++;
+			} while (Thread32Next(hSnap, &te));
+		}
+		CloseHandle(hSnap);
+	}
 }
 
-void UpdateTotalThreadCount(HWND hWnd) {
+void UpdateTotalThreadCount() {
 	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+
 	if (hSnap == INVALID_HANDLE_VALUE) return;
 
 	THREADENTRY32 te;
@@ -515,16 +556,18 @@ void UpdateTotalThreadCount(HWND hWnd) {
 
 	if (Thread32First(hSnap, &te)) {
 		do {
-			totalThreads++;  // Считаем все потоки
+			totalThreads++;
 		} while (Thread32Next(hSnap, &te));
 	}
 
 	CloseHandle(hSnap);
 
-	wchar_t buffer[50];
-	swprintf(buffer, 50, L"Потоков: %d", totalThreads);
-	SetWindowText(hStaticThreadCount, buffer);
+	int threadCount = totalThreads;
+	wchar_t threadCountStr[50];
+	swprintf(threadCountStr, 50, L"Общ. потоков: %d", threadCount);
+	SendMessage(hStatusBar, SB_SETTEXT, 2, (LPARAM)threadCountStr);
 }
+
 
 int ListView_FindItemByLParam(HWND hListView, LPARAM lParam) {
 	LVFINDINFO findInfo = { 0 };
@@ -588,4 +631,3 @@ bool IsSystemProcess(DWORD processID)
 	CloseHandle(hProcess);
 	return isSystem;
 }
-
