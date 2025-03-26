@@ -162,13 +162,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// Создаем дочернее окно-список процессов
 		hListProcesses = CreateWindowW(WC_LISTVIEW, NULL,
 			WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
-			20, 20, 350, 500,
+			2, 2, 500, 670,
 			hWnd, (HMENU)IDC_LIST_PROCESSES, NULL, NULL);
 
 		// Создаем дочернее окно-список потоков
 		hListThreads = CreateWindowW(WC_LISTVIEW, NULL,
 			WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
-			400, 20, 200, 500,
+			532, 2, 300, 670,
 			hWnd, (HMENU)IDC_LIST_THREADS, NULL, NULL);
 
 		// Инициализируем списки
@@ -193,7 +193,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		PopulateProcessesList(hListProcesses);
 
 		// Заполняем список потоков (изначально без выбора процесса)
-		PopulateThreadsList(hListThreads, 0);
+		//PopulateThreadsList(hListThreads, 0);
 		break;
 
 	case WM_PAINT: // Сообщение приходит при необходимости перерисовки окна
@@ -480,17 +480,17 @@ void InitProcessListView(HWND hWndListView)
 	lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;  // Маска для настройки текста, ширины и индекса колонки
 
 	// Колонка с идентификаторами процессов
-	lvc.cx = 80;           // Ширина колонки
+	lvc.cx = 110;           // Ширина колонки
 	lvc.pszText = (LPWSTR)L"id";  // Название колонки
 	ListView_InsertColumn(hWndListView, 0, &lvc);  // Вставка первой колонки
 
 	// Колонка с именами процессов
-	lvc.cx = 180;          // Ширина колонки
+	lvc.cx = 262;          // Ширина колонки
 	lvc.pszText = (LPWSTR)L"Название";  // Название колонки
 	ListView_InsertColumn(hWndListView, 1, &lvc);  // Вставка второй колонки
 
 	// Колонка с количеством потоков
-	lvc.cx = 100;          // Ширина колонки
+	lvc.cx = 110;          // Ширина колонки
 	lvc.pszText = (LPWSTR)L"Потоков";  // Название колонки
 	ListView_InsertColumn(hWndListView, 2, &lvc);  // Вставка третьей колонки
 }
@@ -506,12 +506,12 @@ void InitThreadListView(HWND hWndListView)
 	lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;  // Маска для настройки текста, ширины и индекса колонки
 
 	// Колонка с идентификаторами потоков
-	lvc.cx = 100;           // Ширина колонки
+	lvc.cx = 110;          // Ширина колонки
 	lvc.pszText = (LPWSTR)L"id";  // Название колонки
 	ListView_InsertColumn(hWndListView, 0, &lvc);  // Вставка первой колонки
 
 	// Колонка с идентификаторами процессов
-	lvc.cx = 100;           // Ширина колонки
+	lvc.cx = 172;           // Ширина колонки
 	lvc.pszText = (LPWSTR)L"Процесс-родитель";  // Название колонки
 	ListView_InsertColumn(hWndListView, 1, &lvc);  // Вставка второй колонки
 }
