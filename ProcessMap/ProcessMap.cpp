@@ -273,6 +273,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				sortColumnProcesses = pNMLV->iSubItem;
 				ascendingProcesses = true;
 			}
+			ListView_SortItems(hListProcesses, CompareFuncProcesses, (LPARAM)&ascendingProcesses);
 		}
 
 		// Обработка списка потоков
@@ -285,6 +286,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				sortColumnThreads = pNMLV->iSubItem;
 				ascendingThreads = true;
 			}
+			ListView_SortItems(hListThreads, CompareFuncThreads, (LPARAM)&ascendingThreads);
 		}
 
 		break;
