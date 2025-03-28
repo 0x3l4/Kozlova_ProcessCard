@@ -322,100 +322,57 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 // Функция заполняет список процессов в предоставленном окне списка (list view).
 void PopulateProcessesList(HWND hList)
 {
-	// Сначала удаляем все существующие элементы из списка
+	// Очищаем список
 	ListView_DeleteAllItems(hList);
 
-	// Массив для хранения идентификаторов процессов
-	DWORD processes[1024];
-	DWORD needed;  // Переменная для хранения количества байтов, необходимых для получения всех идентификаторов процессов
+	// Создаём снимок процессов
+	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hSnapshot == INVALID_HANDLE_VALUE) return;
 
-	// Получаем массив идентификаторов активных процессов
-	if (EnumProcesses(processes, sizeof(processes), &needed))
-	{
-		// Вычисляем количество найденных процессов
-		int count = needed / sizeof(DWORD);
+	PROCESSENTRY32 pe32;
+	pe32.dwSize = sizeof(PROCESSENTRY32);
 
-		// Структура для добавления новых элементов в список
-		LVITEM lvI;
+	// Проходим по всем процессам в системе
+	if (Process32First(hSnapshot, &pe32)) {
+		do {
+			// Пропускаем процесс с PID 0 (System Idle Process)
+			if (pe32.th32ProcessID == 0) continue;
 
-		// Проходим по каждому процессу
-		for (int i = 0; i < count; i++)
-		{
-			DWORD pid = processes[i];  // Идентификатор процесса
-			if (pid == 0) continue;   // Пропускаем нулевые значения
+			// PID процесса
+			wchar_t pidStr[10];
+			swprintf_s(pidStr, L"%d", pe32.th32ProcessID);
 
-			// Открываем процесс для получения дополнительной информации
-			HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+			// Имя процесса
+			wchar_t processName[MAX_PATH];
+			wcscpy_s(processName, pe32.szExeFile);
 
-			if (hProcess || !hProcess)
-			{
-				// По умолчанию имя процесса неизвестно
-				wchar_t processName[MAX_PATH] = L"<Unknown>";
-
-				// Получаем имя исполняемого файла процесса
-				GetModuleBaseName(hProcess, NULL, processName, MAX_PATH);
-
-				// Проверяем, является ли процесс системным
-				if (IsSystemProcess(pid) || wcscmp(processName, L"<Unknown>") == 0)
-				{
-					wcscat_s(processName, MAX_PATH, L" [SYSTEM]");
-				}
-
-				// Подсчитываем количество потоков в процессе
-				DWORD threadCount = 0;
-				HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-				int totalThreads = 0;
-				if (hSnap != INVALID_HANDLE_VALUE)
-				{
-					PROCESSENTRY32 pe;
-					pe.dwSize = sizeof(pe);
-					if (Process32First(hSnap, &pe))
-					{
-						totalThreads++;
-						do {
-							if (pe.th32ProcessID == pid) {
-								threadCount = pe.cntThreads;
-								break;
-							}
-						} while (Process32Next(hSnap, &pe));
-					}
-					CloseHandle(hSnap);
-				}
-
-				wchar_t threadCountStr[50];
-				swprintf(threadCountStr, 50, L"Общ. потоков: %d", threadCount);
-				SendMessage(hStatusBar, SB_SETTEXT, 2, (LPARAM)threadCountStr);
-
-				// Преобразовываем идентификаторы в строки
-				wchar_t pidStr[10], threadStr[10];
-				swprintf(pidStr, 10, L"%d", pid);
-				swprintf(threadStr, 10, L"%d", threadCount);
-
-				LVITEM lvI;
-				lvI.mask = LVIF_TEXT | LVIF_PARAM;
-				lvI.iItem = ListView_GetItemCount(hListProcesses);
-				lvI.iSubItem = 0;
-				lvI.pszText = pidStr;
-				lvI.lParam = pid;  // ❗ Храним PID, а не индекс строки!
-				ListView_InsertItem(hListProcesses, &lvI);
-
-				// Добавляем дополнительные столбцы с именем процесса и количеством потоков
-				ListView_SetItemText(hList, lvI.iItem, 1, processName);
-				ListView_SetItemText(hList, lvI.iItem, 2, threadStr);
-
-				// Закрываем дескриптор процесса
-				CloseHandle(hProcess);
+			// Проверяем, является ли процесс системным
+			if (IsSystemProcess(pe32.th32ProcessID) || pe32.th32ProcessID == 4 || pe32.th32ProcessID == 124) {
+				wcscat_s(processName, L" [SYSTEM]");
 			}
-			// Обновляем статус-бар с актуальным количеством процессов
-			//wchar_t processCountStr[50];
-			//swprintf(processCountStr, 50, L"Процессовввв: %d", count);
-			//SendMessage(hStatusBar, SB_SETTEXT, 1, (LPARAM)processCountStr);
-		}
 
+			// Количество потоков
+			wchar_t threadStr[10];
+			swprintf_s(threadStr, L"%d", pe32.cntThreads);
+
+			// Добавляем процесс в ListView
+			LVITEM lvI;
+			lvI.mask = LVIF_TEXT | LVIF_PARAM;
+			lvI.iItem = ListView_GetItemCount(hList);
+			lvI.iSubItem = 0;
+			lvI.pszText = pidStr;
+			lvI.lParam = pe32.th32ProcessID;  // ❗ Храним PID, а не индекс строки!
+			ListView_InsertItem(hList, &lvI);
+
+			// Добавляем имя процесса и количество потоков
+			ListView_SetItemText(hList, lvI.iItem, 1, processName);
+			ListView_SetItemText(hList, lvI.iItem, 2, threadStr);
+
+		} while (Process32Next(hSnapshot, &pe32));
 	}
 
-	UpdateProcessCount();
-	UpdateTotalThreadCount();
+	// Закрываем снимок процессов
+	CloseHandle(hSnapshot);
 }
 
 // Функция заполняет список потоков для указанного процесса в предоставленное окно списка.
